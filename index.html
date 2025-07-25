@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bugflow</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f3f3f3;
+            color: #333;
+            font-size: 12px;
+        }
+
+        .console-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tabs {
+            background-color: #e8e8e8;
+            border-bottom: 1px solid #d1d1d1;
+            padding: 8px 12px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .tab {
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .tab.active {
+            background-color: #fff;
+            font-weight: 500;
+        }
+
+        .tab.network::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 6px;
+            height: 6px;
+            background-color: #ff4444;
+            border-radius: 50%;
+        }
+
+        .controls {
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #d1d1d1;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 300px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .errors-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .errors-toggle input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .filter-tabs {
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #d1d1d1;
+            padding: 8px 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-tab {
+            padding: 4px 12px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            background-color: #fff;
+        }
+
+        .filter-tab.active {
+            background-color: #333;
+            color: #fff;
+            border-color: #333;
+        }
+
+        .network-table {
+            flex: 1;
+            overflow: auto;
+            background-color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        th, td {
+            padding: 4px 8px;
+            text-align: left;
+            border-bottom: 1px solid #e8e8e8;
+            max-width: 0;
+        }
+
+        td.name-col {
+            max-width: 220px;
+            min-width: 180px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th {
+            background-color: #f8f8f8;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        tr.selected {
+            background-color: #e3f2fd;
+        }
+
+        tr.error {
+            background-color: #ffebee;
+        }
+
+        tr.error.hidden {
+            display: none;
+        }
+
+        .status-200 {
+            color: #4caf50;
+        }
+
+        .status-error {
+            color: #f44336;
+        }
+
+        .cache-miss {
+            color: #ff9800;
+        }
+
+        .time-bar {
+            height: 12px;
+            background-color: #e3f2fd;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .time-bar-fill {
+            height: 100%;
+            background-color: #2196f3;
+            border-radius: 2px;
+        }
+
+        .details-panel {
+            display: none;
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background-color: #fff;
+            border-left: 1px solid #d1d1d1;
+            z-index: 100;
+        }
+
+        .details-panel.active {
+            display: block;
+        }
+
+        .details-header {
+            background-color: #f8f8f8;
+            padding: 8px 12px;
+            border-bottom: 1px solid #d1d1d1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .details-tabs {
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #d1d1d1;
+            padding: 8px 12px;
+            display: flex;
+            gap: 16px;
+        }
+
+        .details-tab {
+            padding: 4px 8px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .details-tab.active {
+            border-bottom-color: #2196f3;
+            font-weight: 500;
+        }
+
+        .details-content {
+            padding: 12px;
+            overflow: auto;
+            height: calc(100% - 100px);
+        }
+
+        .details-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+
+        .details-label {
+            width: 140px;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .details-value {
+            flex: 1;
+            font-family: monospace;
+            word-break: break-all;
+            width: 80%;
+            font-size: 11px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .icon-font {
+            background-color: #9c27b0;
+            border-radius: 2px;
+            color: white;
+            text-align: center;
+            line-height: 16px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .icon-xhr {
+            background-color: #ff9800;
+            border-radius: 2px;
+            color: white;
+            text-align: center;
+            line-height: 16px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="console-container">
+        <div class="tabs">
+            <div class="tab active network">Network</div>
+            <!-- <div class="tab">Actions</div> -->
+            <div class="tab" id="vuexStoreTab">Vuex Store</div>
+            <input type="file" id="importJsonInput" accept="application/json" style="display:none" />
+            <button id="importJsonBtn" style="margin-left:8px; padding:4px 12px; font-size:12px; border-radius:3px; border:1px solid #ccc; background:#fff; cursor:pointer;">Import JSON</button>
+        </div>
+
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="Filter" id="filterInput">
+            <label class="errors-toggle">
+                <input type="checkbox" id="errorsOnly">
+                <span>Errors only</span>
+            </label>
+         
+        </div>
+
+        <div class="filter-tabs">
+            <div class="filter-tab active" data-filter="all">All</div>
+            <div class="filter-tab" data-filter="fetch">Fetch/XHR</div>
+            <div class="filter-tab" data-filter="ws">WS</div>
+            <div class="filter-tab" data-filter="js">JS</div>
+            <div class="filter-tab" data-filter="css">CSS</div>
+            <div class="filter-tab" data-filter="media">Media</div>
+            <div class="filter-tab" data-filter="font">Font</div>
+            <div class="filter-tab" data-filter="doc">Doc</div>
+            <div class="filter-tab" data-filter="other">Other</div>
+        </div>
+
+        <div class="network-table" id="networkTableContainer">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 4%">#</th>
+                        <th style="width: 2%"></th>
+                        <th style="width: 25%; min-width: 180px;">Name</th>
+                        <th style="width: 8%">Method</th>
+                        <th style="width: 8%">Status</th>
+                        <th style="width: 12%">Domain</th>
+                        <th style="width: 8%">Type</th>
+                    </tr>
+                </thead>
+                <tbody id="networkTableBody">
+                    <!-- Rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="vuexStoreContainer" style="display:none; padding: 24px;"></div>
+    </div>
+
+    <div class="details-panel" id="detailsPanel">
+        <div class="details-header">
+            <span>Request Details</span>
+            <button class="close-btn" onclick="closeDetails()">×</button>
+        </div>
+        
+        <div class="details-tabs">
+            <div class="details-tab active" data-tab="headers">Headers</div>
+            <div class="details-tab" data-tab="payload">Payload</div>
+            <div class="details-tab" data-tab="response">Response</div>
+        </div>
+
+        <div class="details-content" id="detailsContent">
+            <!-- Details content will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        let networkData = [];
+        let vuexStoreData = {};
+        function renderTable() {
+            const tbody = document.getElementById('networkTableBody');
+            const filterInput = document.getElementById('filterInput').value.toLowerCase();
+            const errorsOnly = document.getElementById('errorsOnly').checked;
+            const activeFilter = document.querySelector('.filter-tab.active').dataset.filter;
+
+            tbody.innerHTML = '';
+
+            networkData.forEach(item => {
+                if (filterInput && !item.name.toLowerCase().includes(filterInput)) {
+                    return;
+                }
+
+                if (errorsOnly && !item.isError) {
+                    return;
+                }
+
+                if (activeFilter !== 'all' && item.category !== activeFilter) {
+                    return;
+                }
+
+                const row = document.createElement('tr');
+                row.className = item.isError ? 'error' : '';
+                row.onclick = () => showDetails(item);
+
+                const statusClass = item.status.toString() === '200' ? 'status-200' : 
+                                   item.status.toString() === '204' ? 'status-200' : 
+                                   item.status.toString() === '404' ? 'status-error' : 'status-error';
+
+                const icon = item.type === 'woff2' ? 'T' : 
+                           item.type === 'xhr' ? 'X' : 
+                           item.type === 'script' ? 'J' : 
+                           item.type === 'stylesheet' ? 'S' : 'D';
+                const iconClass = item.type === 'woff2' ? 'icon-font' : 'icon-xhr';
+
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td><span class="icon ${iconClass}">${icon}</span></td>
+                    <td class="name-col" title="${item.name}">${item.name}</td>
+                    <td>${item.method}</td>
+                    <td class="${statusClass}">${item.status}</td>
+                    <td>${item.domain}</td>
+                    <td>${item.type}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function showDetails(item) {
+            const detailsPanel = document.getElementById('detailsPanel');
+            const detailsContent = document.getElementById('detailsContent');
+            
+            detailsPanel.classList.add('active');
+            
+            // Store current item for tab switching
+            window.currentItem = item;
+            
+            // Show headers tab by default
+            showTab('headers');
+        }
+
+        function showTab(tabName) {
+            const item = window.currentItem;
+            const detailsContent = document.getElementById('detailsContent');
+            
+            // Update active tab
+            document.querySelectorAll('.details-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            
+            if (tabName === 'headers') {
+                detailsContent.innerHTML = `
+                    <div style="background-color: #f8f8f8; padding: 8px; margin-bottom: 16px; border-radius: 4px;">
+                        <h3 style="margin-bottom: 8px; color: #333;">General</h3>
+                        <div class="details-row">
+                            <div class="details-label">Request URL:</div>
+                            <div class="details-value">${item.request.url}</div>
+                        </div>
+                        <div class="details-row">
+                            <div class="details-label">Request Method:</div>
+                            <div class="details-value">${item.request.method}</div>
+                        </div>
+                        <div class="details-row">
+                            <div class="details-label">Status Code:</div>
+                            <div class="details-value"><span class="${item.response.status >= 400 ? 'status-error' : 'status-200'}">${item.response.status} ${item.response.statusText}</span></div>
+                        </div>
+                    </div>
+                    
+                    <div style="background-color: #f8f8f8; padding: 8px; margin-bottom: 16px; border-radius: 4px;">
+                        <h3 style="margin-bottom: 8px; color: #333;">Response Headers</h3>
+                        ${item.response.headers.map(header => `
+                            <div class="details-row">
+                                <div class="details-label">${header.name}:</div>
+                                <div class="details-value">${header.value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="background-color: #f8f8f8; padding: 8px; border-radius: 4px;">
+                        <h3 style="margin-bottom: 8px; color: #333;">Request Headers</h3>
+                        ${item.request.headers.map(header => `
+                            <div class="details-row">
+                                <div class="details-label">${header.name}:</div>
+                                <div class="details-value">${header.value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (tabName === 'payload') {
+                let payloadText = '';
+                if (item.request.postData && item.request.postData.text) {
+                    const raw = decodeURIComponent(item.request.postData.text);
+                    try {
+                        const json = JSON.parse(raw);
+                        payloadText = `<pre style="background-color: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 11px; white-space: pre-wrap;">${JSON.stringify(json, null, 2)}</pre>`;
+                    } catch (e) {
+                        payloadText = `<pre style="background-color: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 11px; white-space: pre-wrap;">${raw}</pre>`;
+                    }
+                } else {
+                    payloadText = '<p style="color: #666; font-style: italic;">No payload data available</p>';
+                }
+                detailsContent.innerHTML = `
+                    <div>
+                        <h3 style="margin-bottom: 12px; color: #333;">Request Payload</h3>
+                        ${payloadText}
+                    </div>
+                `;
+            } else if (tabName === 'response') {
+                let responseText = '';
+                if (item.response.content && item.response.content.text) {
+                    const raw = item.response.content.text;
+                    try {
+                        const json = JSON.parse(raw);
+                        responseText = `<pre style="background-color: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 11px; white-space: pre-wrap;">${JSON.stringify(json, null, 2)}</pre>`;
+                    } catch (e) {
+                        responseText = `<pre style="background-color: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 11px; white-space: pre-wrap;">${raw}</pre>`;
+                    }
+                } else {
+                    responseText = '<p style="color: #666; font-style: italic;">No response content available</p>';
+                }
+                detailsContent.innerHTML = `
+                    <div>
+                        <h3 style="margin-bottom: 12px; color: #333;">Response Content</h3>
+                        ${responseText}
+                    </div>
+                `;
+            }
+        }
+
+        function closeDetails() {
+            document.getElementById('detailsPanel').classList.remove('active');
+        }
+
+        // Event listeners
+        document.getElementById('filterInput').addEventListener('input', renderTable);
+        document.getElementById('errorsOnly').addEventListener('change', renderTable);
+
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+              
+                renderTable();
+            });
+        });
+
+        document.querySelectorAll('.details-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                showTab(tabName);
+            });
+        });
+
+        // Initial render
+        renderTable();
+
+        // Import JSON logic
+        document.getElementById('importJsonBtn').addEventListener('click', function() {
+            document.getElementById('importJsonInput').click();
+        });
+        document.getElementById('importJsonInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    console.log("imported", imported);
+                    const _networkData = imported.network.log.entries;
+                    const _vuexStoreData = imported.nuxtData.store;
+                    const formattedNetworkData = _networkData.map((entry,index) => ({
+                        id: index + 1,
+                        name: entry.request.url.split('/').pop(),
+                        method: entry.request.method,
+                        status: entry.response.status,
+                        domain: entry.request.url.split('//')[1].split('/')[0],
+                        isError: entry.response.status >= 400,
+                        url: entry.request.url,
+                        category: 'fetch',
+                        request: entry.request,
+                        response: entry.response,
+                        postData: entry.request.postData,
+                        type: 'xhr'
+                    }))
+                    renderVuexStore(document.getElementById('vuexStoreContainer'), _vuexStoreData);
+                    console.log("networkData", formattedNetworkData);
+                    if (Array.isArray(formattedNetworkData)) {
+                        networkData = formattedNetworkData;
+                        renderTable();
+                        closeDetails();
+                    } else {
+                        alert('Invalid JSON: Expected an array of network entries.');
+                    }
+                } catch (err) {
+                    alert('Failed to parse JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            // Reset input so same file can be imported again if needed
+            event.target.value = '';
+        });
+
+        // --- Vuex Store Section ---
+        // Mock Vuex store data for demonstration
+
+
+        function renderVuexStore(container, store) {
+            container.innerHTML = '';
+            if (!store || Object.keys(store).length === 0) {
+                container.innerHTML = '<div style="color:#888;font-size:15px;">No store information found.</div>';
+                return;
+            }
+            console.log("store", store);
+            Object.entries(store).forEach(([storeName, storeObj]) => {
+                if (!storeObj || (!storeObj.state && !storeObj.getters)) return;
+                const storeDiv = document.createElement("div");
+                storeDiv.style.marginBottom = "28px";
+                storeDiv.style.padding = "0";
+                storeDiv.style.background = "none";
+                storeDiv.style.border = "none";
+                storeDiv.style.borderRadius = "0";
+
+                // --- Collapsible State Section ---
+                const stateSection = document.createElement("div");
+                stateSection.style.marginBottom = "18px";
+                stateSection.style.background = "#fff";
+                stateSection.style.borderRadius = "14px";
+                stateSection.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                stateSection.style.padding = "0 0 0 0";
+                stateSection.style.overflow = "hidden";
+
+                // State header with toggle
+                const stateHeader = document.createElement("div");
+                stateHeader.style.display = "flex";
+                stateHeader.style.alignItems = "center";
+                stateHeader.style.cursor = "pointer";
+                stateHeader.style.userSelect = "none";
+                stateHeader.style.gap = "8px";
+                stateHeader.style.fontWeight = "700";
+                stateHeader.style.fontSize = "18px";
+                stateHeader.style.padding = "18px 24px";
+                stateHeader.style.borderBottom = "1.5px solid #f3f4f6";
+                stateHeader.style.background = "#fff";
+                stateHeader.style.borderRadius = "14px 14px 0 0";
+                const stateToggle = document.createElement("span");
+                stateToggle.innerHTML = '<svg width="18" height="18" style="transition:transform 0.2s;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="#25c9d0" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>';
+                stateToggle.style.display = "inline-flex";
+                stateToggle.style.alignItems = "center";
+                stateToggle.style.justifyContent = "center";
+                stateToggle.style.transition = "transform 0.2s";
+                stateHeader.appendChild(stateToggle);
+                const stateTitle = document.createElement("span");
+                stateTitle.innerHTML = `<strong>State</strong>`;
+                stateHeader.appendChild(stateTitle);
+                stateSection.appendChild(stateHeader);
+
+                // State search box
+                const stateSearch = document.createElement("div");
+                stateSearch.style.display = "flex";
+                stateSearch.style.alignItems = "center";
+                stateSearch.style.padding = "0 12px";
+                stateSearch.style.borderBottom = "1.5px solid #f3f4f6";
+                const stateSearchIcon = document.createElement("span");
+                stateSearchIcon.innerHTML = '<svg width="16" height="16" fill="none" stroke="#bbb" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+                stateSearchIcon.style.marginRight = "6px";
+                const stateSearchInput = document.createElement("input");
+                stateSearchInput.type = "text";
+                stateSearchInput.placeholder = "Search state...";
+                stateSearchInput.style.margin = "0";
+                stateSearchInput.style.padding = "8px 8px";
+                stateSearchInput.style.fontSize = "15px";
+                stateSearchInput.style.width = "100%";
+                stateSearchInput.style.border = "none";
+                stateSearchInput.style.background = "transparent";
+                stateSearchInput.style.outline = "none";
+                stateSearchInput.style.borderRadius = "6px";
+                stateSearch.appendChild(stateSearchIcon);
+                stateSearch.appendChild(stateSearchInput);
+                stateSection.appendChild(stateSearch);
+
+                // State pre
+                const statePre = document.createElement("pre");
+                statePre.style.padding = "18px 24px";
+                statePre.style.borderRadius = "0 0 14px 14px";
+                statePre.style.fontSize = "15px";
+                statePre.style.overflowX = "auto";
+                statePre.style.margin = "0";
+                statePre.style.fontFamily = "Menlo, Monaco, Consolas, monospace";
+                statePre.style.color = "#3b3b3b";
+                let stateJson = JSON.stringify(storeObj.state, null, 2);
+                statePre.textContent = stateJson;
+                stateSection.appendChild(statePre);
+
+                // Collapsible logic for state
+                let stateOpen = true;
+                stateHeader.onclick = () => {
+                    stateOpen = !stateOpen;
+                    stateToggle.style.transform = stateOpen ? "rotate(0deg)" : "rotate(-90deg)";
+                    stateSearch.style.display = stateOpen ? "flex" : "none";
+                    statePre.style.display = stateOpen ? "" : "none";
+                    stateHeader.style.borderBottom = stateOpen ? "1.5px solid #f3f4f6" : "none";
+                    stateHeader.style.background = stateOpen ? "#f6fafd" : "#fff";
+                };
+                stateHeader.style.background = stateOpen ? "#f6fafd" : "#fff";
+
+                // Search logic for state
+                stateSearchInput.oninput = function () {
+                    const q = this.value.trim();
+                    if (!q) {
+                        statePre.textContent = stateJson;
+                        return;
+                    }
+                    const filtered = filterObjectByQuery(storeObj.state, q);
+                    statePre.textContent = filtered !== undefined ? JSON.stringify(filtered, null, 2) : "{}";
+                };
+
+                storeDiv.appendChild(stateSection);
+
+                // --- Collapsible Getters Section ---
+                if (storeObj.getters && Object.keys(storeObj.getters).length > 0) {
+                    const gettersSection = document.createElement("div");
+                    gettersSection.style.marginBottom = "18px";
+                    gettersSection.style.background = "#fff";
+                    gettersSection.style.borderRadius = "14px";
+                    gettersSection.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                    gettersSection.style.padding = "0 0 0 0";
+                    gettersSection.style.overflow = "hidden";
+
+                    // Getters header with toggle
+                    const gettersHeader = document.createElement("div");
+                    gettersHeader.style.display = "flex";
+                    gettersHeader.style.alignItems = "center";
+                    gettersHeader.style.cursor = "pointer";
+                    gettersHeader.style.userSelect = "none";
+                    gettersHeader.style.gap = "8px";
+                    gettersHeader.style.fontWeight = "700";
+                    gettersHeader.style.fontSize = "18px";
+                    gettersHeader.style.padding = "18px 24px";
+                    gettersHeader.style.borderBottom = "1.5px solid #f3f4f6";
+                    gettersHeader.style.background = "#fff";
+                    gettersHeader.style.borderRadius = "14px 14px 0 0";
+                    const gettersToggle = document.createElement("span");
+                    gettersToggle.innerHTML = '<svg width="18" height="18" style="transition:transform 0.2s;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="#25c9d0" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>';
+                    gettersToggle.style.display = "inline-flex";
+                    gettersToggle.style.alignItems = "center";
+                    gettersToggle.style.justifyContent = "center";
+                    gettersToggle.style.transition = "transform 0.2s";
+                    gettersHeader.appendChild(gettersToggle);
+                    const gettersTitle = document.createElement("span");
+                    gettersTitle.innerHTML = `<strong>Getters</strong>`;
+                    gettersHeader.appendChild(gettersTitle);
+                    gettersSection.appendChild(gettersHeader);
+
+                    // Getters search box
+                    const gettersSearch = document.createElement("div");
+                    gettersSearch.style.display = "flex";
+                    gettersSearch.style.alignItems = "center";
+                    gettersSearch.style.padding = "0 12px";
+                    gettersSearch.style.borderBottom = "1.5px solid #f3f4f6";
+                    const gettersSearchIcon = document.createElement("span");
+                    gettersSearchIcon.innerHTML = '<svg width="16" height="16" fill="none" stroke="#bbb" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+                    gettersSearchIcon.style.marginRight = "6px";
+                    const gettersSearchInput = document.createElement("input");
+                    gettersSearchInput.type = "text";
+                    gettersSearchInput.placeholder = "Search getters...";
+                    gettersSearchInput.style.margin = "0";
+                    gettersSearchInput.style.padding = "8px 8px";
+                    gettersSearchInput.style.fontSize = "15px";
+                    gettersSearchInput.style.width = "100%";
+                    gettersSearchInput.style.border = "none";
+                    gettersSearchInput.style.background = "transparent";
+                    gettersSearchInput.style.outline = "none";
+                    gettersSearchInput.style.borderRadius = "6px";
+                    gettersSearch.appendChild(gettersSearchIcon);
+                    gettersSearch.appendChild(gettersSearchInput);
+                    gettersSection.appendChild(gettersSearch);
+
+                    // Getters pre
+                    const gettersPre = document.createElement("pre");
+                    gettersPre.style.padding = "18px 24px";
+                    gettersPre.style.borderRadius = "0 0 14px 14px";
+                    gettersPre.style.fontSize = "15px";
+                    gettersPre.style.overflowX = "auto";
+                    gettersPre.style.margin = "0";
+                    gettersPre.style.fontFamily = "Menlo, Monaco, Consolas, monospace";
+                    gettersPre.style.color = "#3b3b3b";
+                    let gettersJson = JSON.stringify(storeObj.getters, null, 2);
+                    gettersPre.textContent = gettersJson;
+                    gettersSection.appendChild(gettersPre);
+
+                    // Collapsible logic for getters
+                    let gettersOpen = true;
+                    gettersHeader.onclick = () => {
+                        gettersOpen = !gettersOpen;
+                        gettersToggle.style.transform = gettersOpen ? "rotate(0deg)" : "rotate(-90deg)";
+                        gettersSearch.style.display = gettersOpen ? "flex" : "none";
+                        gettersPre.style.display = gettersOpen ? "" : "none";
+                        gettersHeader.style.borderBottom = gettersOpen ? "1.5px solid #f3f4f6" : "none";
+                        gettersHeader.style.background = gettersOpen ? "#f6fafd" : "#fff";
+                    };
+                    gettersHeader.style.background = gettersOpen ? "#f6fafd" : "#fff";
+
+                    // Search logic for getters
+                    gettersSearchInput.oninput = function () {
+                        const q = this.value.trim();
+                        if (!q) {
+                            gettersPre.textContent = gettersJson;
+                            return;
+                        }
+                        const filtered = filterObjectByQuery(storeObj.getters, q);
+                        gettersPre.textContent = filtered !== undefined ? JSON.stringify(filtered, null, 2) : "{}";
+                    };
+
+                    storeDiv.appendChild(gettersSection);
+                }
+
+                container.appendChild(storeDiv);
+            });
+        }
+
+        // Helper: filter object by query string (shallow search)
+        function filterObjectByQuery(obj, query) {
+            if (!obj) return {};
+            const lowerQ = query.toLowerCase();
+            if (typeof obj !== 'object' || obj === null) return {};
+            if (Array.isArray(obj)) {
+                // For arrays, filter items that match the query
+                return obj
+                    .map((item, idx) => {
+                        const res = filterObjectByQuery(item, query);
+                        return (res && Object.keys(res).length > 0) ? res : undefined;
+                    })
+                    .filter(Boolean);
+            }
+            // For objects, recursively search and only keep parents of matches
+            const filtered = {};
+            Object.entries(obj).forEach(([k, v]) => {
+                if (k.toLowerCase().includes(lowerQ)) {
+                    filtered[k] = v;
+                } else if (typeof v === 'string' && v.toLowerCase().includes(lowerQ)) {
+                    filtered[k] = v;
+                } else if (typeof v === 'object' && v !== null) {
+                    const child = filterObjectByQuery(v, query);
+                    if (child && ((Array.isArray(child) && child.length > 0) || (!Array.isArray(child) && Object.keys(child).length > 0))) {
+                        filtered[k] = child;
+                    }
+                }
+            });
+            return filtered;
+        }
+
+        // Tab switching logic
+        document.querySelectorAll('.tab').forEach((tab, idx) => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                if (this.textContent.trim() === 'Vuex Store') {
+                    document.getElementById('networkTableContainer').style.display = 'none';
+                    document.getElementById('vuexStoreContainer').style.display = '';
+                    document.querySelector('.controls').style.display = 'none';
+                    document.querySelector('.filter-tabs').style.display = 'none';
+                } else {
+                    document.getElementById('networkTableContainer').style.display = '';
+                    document.getElementById('vuexStoreContainer').style.display = 'none';
+                    document.querySelector('.controls').style.display = '';
+                    document.querySelector('.filter-tabs').style.display = '';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
